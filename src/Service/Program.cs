@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using Service.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,12 @@ builder.Services.AddOpenApi(options =>
 // Scalar
 builder.Services.Configure<ScalarOptions>(options =>
 {
-    options.Title = "Prototype Service API";
+    options.Title = "Service API";
 });
+
+// Реєстрація сервісів для DI
+builder.Services.AddSingleton<IHealthService, HealthService>();
+builder.Services.AddSingleton<IInfoService, InfoService>();
 
 var app = builder.Build();
 

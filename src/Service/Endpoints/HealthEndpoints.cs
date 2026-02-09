@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
+using Service.Services;
 
 public static class HealthEndpoints
 {
@@ -12,11 +13,11 @@ public static class HealthEndpoints
                 return operation;
             });
 
-        group.MapGet("/", () => Results.Ok(new
+        group.MapGet("/", (IHealthService healthService) =>
         {
-            status = "OK",
-            timestamp = DateTime.UtcNow
-        }));
+            var result = healthService.GetHealthStatus();
+            return Results.Ok(result);
+        });
 
         return group;
     }

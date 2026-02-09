@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
+using Service.Services;
 
 public static class InfoEndpoints
 {
@@ -12,12 +13,11 @@ public static class InfoEndpoints
                 return operation;
             });
 
-        group.MapGet("/", () => Results.Ok(new
+        group.MapGet("/", (IInfoService infoService) =>
         {
-            service = "Prototype.Service",
-            version = "1.0.0",
-            environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"
-        }));
+            var info = infoService.GetServiceInfo();
+            return Results.Ok(info);
+        });
 
         return group;
     }
