@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Moq;
 using Service.Services;
 
-namespace Prototype.Service.Tests.Unit;
+namespace Service.Tests.Unit;
 
 public class InfoServiceTests
 {
@@ -20,7 +20,7 @@ public class InfoServiceTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Service.Should().Be("Prototype.Service");
+        result.Service.Should().Be("Service");
     }
 
     [Fact]

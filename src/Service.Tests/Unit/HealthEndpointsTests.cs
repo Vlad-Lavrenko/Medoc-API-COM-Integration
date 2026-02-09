@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Service.Services;
 
-namespace Prototype.Service.Tests.Unit;
+namespace Service.Tests.Unit;
 
 public class HealthServiceTests
 {
