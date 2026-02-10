@@ -1,24 +1,28 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
 using Service.Services;
 
-public static class InfoEndpoints
+namespace Service.Endpoints
 {
-    public static RouteGroupBuilder MapInfoEndpoints(this IEndpointRouteBuilder endpoints)
+
+    public static class InfoEndpoints
     {
-        var group = endpoints.MapGroup("/info");
-
-        group.MapGet("/", (IInfoService infoService) =>
+        public static RouteGroupBuilder MapInfoEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            var info = infoService.GetServiceInfo();
-            return Results.Ok(info);
-        })
-        .AddOpenApiOperationTransformer((operation, context, ct) => 
-        {
-            operation.Summary = "Service info";
-            operation.Description = "Інформація про службу";
-            return Task.CompletedTask;
-        });
+            var group = endpoints.MapGroup("/info");
 
-        return group;
+            group.MapGet("/", (IInfoService infoService) =>
+            {
+                var info = infoService.GetServiceInfo();
+                return Results.Ok(info);
+            })
+            .AddOpenApiOperationTransformer((operation, context, ct) =>
+            {
+                operation.Summary = "Service info";
+                operation.Description = "Інформація про службу";
+                return Task.CompletedTask;
+            });
+
+            return group;
+        }
     }
 }

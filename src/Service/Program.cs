@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Service.Services;
+using Service.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,24 +1,27 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
 using Service.Services;
 
-public static class HealthEndpoints
+namespace Service.Endpoints
 {
-    public static RouteGroupBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
+    public static class HealthEndpoints
     {
-        var group = endpoints.MapGroup("/health");
-
-        group.MapGet("/", (IHealthService healthService) =>
+        public static RouteGroupBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            var result = healthService.GetHealthStatus();
-            return Results.Ok(result);
-        })
-        .AddOpenApiOperationTransformer((operation, context, ct) => 
-        {
-            operation.Summary = "Health check";
-            operation.Description = "Перевірка стану служби";
-            return Task.CompletedTask;
-        });
+            var group = endpoints.MapGroup("/health");
 
-        return group;
+            group.MapGet("/", (IHealthService healthService) =>
+            {
+                var result = healthService.GetHealthStatus();
+                return Results.Ok(result);
+            })
+            .AddOpenApiOperationTransformer((operation, context, ct) => 
+            {
+                operation.Summary = "Health check";
+                operation.Description = "Перевірка стану служби";
+                return Task.CompletedTask;
+            });
+
+            return group;
+        }
     }
 }
