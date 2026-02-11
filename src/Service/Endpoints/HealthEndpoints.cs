@@ -1,28 +1,34 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
 using MedocIntegration.Service.Services;
+using MedocIntegration.Service.Extensions;
 
-namespace MedocIntegration.Service.Endpoints
+namespace MedocIntegration.Service.Endpoints;
 
+public static class HealthEndpoints
 {
-    public static class HealthEndpoints
+    public static RouteGroupBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        public static RouteGroupBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
-        {
-            var group = endpoints.MapGroup("/health");
+        var group = endpoints.MapGroup("/health");
 
-            group.MapGet("/", (IHealthService healthService) =>
+        group.MapGet("/", (IHealthService healthService) =>
+        {
+            try
             {
                 var result = healthService.GetHealthStatus();
-                return Results.Ok(result);
-            })
-            .AddOpenApiOperationTransformer((operation, context, ct) => 
+                return ResultExtensions.OkApiResponse(result);
+            }
+            catch (Exception ex)
             {
-                operation.Summary = "Health check";
-                operation.Description = "Перевірка стану служби";
-                return Task.CompletedTask;
-            });
+                return ResultExtensions.InternalServerErrorApiResponse(ex.Message);
+            }
+        })
+        .AddOpenApiOperationTransformer((operation, context, ct) =>
+        {
+            operation.Summary = "Health check";
+            operation.Description = "Перевірка стану служби. Повертає статус 'ok' та дані про здоров'я системи.";
+            return Task.CompletedTask;
+        });
 
-            return group;
-        }
+        return group;
     }
 }

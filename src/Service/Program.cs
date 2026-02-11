@@ -1,13 +1,14 @@
-﻿using MedocIntegration.Common.Constants;
-using MedocIntegration.Common.Logging;
-using MedocIntegration.Service.Endpoints;
-using MedocIntegration.Service.Services;
-using Microsoft.AspNetCore.OpenApi;
+﻿using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
+using MedocIntegration.Common.Logging;
+using MedocIntegration.Common.Constants;
+using MedocIntegration.Service.Services;
+using MedocIntegration.Service.Endpoints;
+using MedocIntegration.Service.Middleware;
 
 // ✅ Bootstrap logger - єдина конфігурація для файлів
 Log.Logger = new LoggerConfiguration()
@@ -58,6 +59,9 @@ try
     builder.Services.AddSingleton<IInfoService, InfoService>();
 
     var app = builder.Build();
+
+    // ✅ Глобальна обробка помилок (додати на початку pipeline)
+    app.UseGlobalExceptionHandler();
 
     // HTTP Request logging
     app.UseSerilogRequestLogging(options =>
