@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
-using Service.Services;
+using MedocIntegration.Service.Services;
 
-namespace Service.Endpoints
+namespace MedocIntegration.Service.Endpoints
 {
 
     public static class InfoEndpoints

@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="src/Common/Common.csproj" Id="3685ea94-3d97-4384-af2c-6b36c6e94d36" />
   <Project Path="src/Service.Tests/Service.Tests.csproj" />
   <Project Path="src/Service/Service.csproj" />
 </Solution>

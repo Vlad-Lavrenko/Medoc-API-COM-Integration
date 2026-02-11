@@ -1,7 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
+using MedocIntegration.Common.Models;
 
-namespace Service.Services;
+namespace MedocIntegration.Service.Services;
 
 public interface IInfoService
 {
@@ -11,18 +12,22 @@ public interface IInfoService
 public class InfoService : IInfoService
 {
     private readonly IHostEnvironment _environment;
+    private readonly ILogger<InfoService> _logger;
 
-    public InfoService(IHostEnvironment environment)
+    public InfoService(IHostEnvironment environment, ILogger<InfoService> logger)
     {
         _environment = environment;
+        _logger = logger;
     }
 
     public ServiceInfo GetServiceInfo()
     {
+        _logger.LogDebug("Getting service information");
+
         var assembly = Assembly.GetExecutingAssembly();
         var version = assembly.GetName().Version?.ToString() ?? "unknown";
 
-        return new ServiceInfo
+        var info = new ServiceInfo
         {
             Service = assembly.GetName().Name ?? "Service",
             Version = version,
@@ -30,14 +35,10 @@ public class InfoService : IInfoService
             HostName = Environment.MachineName,
             StartedAt = Process.GetCurrentProcess().StartTime
         };
-    }
-}
 
-public record ServiceInfo
-{
-    public required string Service { get; init; }
-    public required string Version { get; init; }
-    public required string Environment { get; init; }
-    public required string HostName { get; init; }
-    public required DateTime StartedAt { get; init; }
+        _logger.LogInformation("Service info retrieved: {ServiceName} v{Version} on {HostName}",
+            info.Service, info.Version, info.HostName);
+
+        return info;
+    }
 }

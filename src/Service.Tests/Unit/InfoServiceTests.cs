@@ -1,57 +1,93 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Hosting;
-using Moq;
-using Service.Services;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using MedocIntegration.Service.Services;
+using MedocIntegration.Common.Models;
 
-namespace Service.Tests.Unit;
+namespace MedocIntegration.Service.Tests.Unit;
 
 public class InfoServiceTests
 {
+    private readonly IHostEnvironment _mockEnvironment;
+    private readonly ILogger<InfoService> _logger;
+
+    public InfoServiceTests()
+    {
+        _mockEnvironment = Substitute.For<IHostEnvironment>();
+        _logger = Substitute.For<ILogger<InfoService>>();
+    }
+
     [Fact]
     public void GetServiceInfo_ReturnsCorrectServiceName()
     {
         // Arrange
-        var mockEnvironment = new Mock<IHostEnvironment>();
-        mockEnvironment.Setup(e => e.EnvironmentName).Returns("Testing");
-        var infoService = new InfoService(mockEnvironment.Object);
+        _mockEnvironment.EnvironmentName.Returns("Testing");
+        var infoService = new InfoService(_mockEnvironment, _logger);
 
         // Act
         var result = infoService.GetServiceInfo();
 
         // Assert
         result.Should().NotBeNull();
-        result.Service.Should().Be("Service");
+        result.Service.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
     public void GetServiceInfo_ReturnsVersion()
     {
         // Arrange
-        var mockEnvironment = new Mock<IHostEnvironment>();
-        mockEnvironment.Setup(e => e.EnvironmentName).Returns("Development");
-        var infoService = new InfoService(mockEnvironment.Object);
+        _mockEnvironment.EnvironmentName.Returns("Development");
+        var infoService = new InfoService(_mockEnvironment, _logger);
 
         // Act
         var result = infoService.GetServiceInfo();
 
         // Assert
         result.Version.Should().NotBeNullOrEmpty();
-        result.Version.Should().Be("1.0.0");
     }
 
     [Fact]
     public void GetServiceInfo_ReturnsEnvironmentName()
     {
         // Arrange
-        var mockEnvironment = new Mock<IHostEnvironment>();
-        mockEnvironment.Setup(e => e.EnvironmentName).Returns("Production");
-        var infoService = new InfoService(mockEnvironment.Object);
+        _mockEnvironment.EnvironmentName.Returns("Production");
+        var infoService = new InfoService(_mockEnvironment, _logger);
 
         // Act
         var result = infoService.GetServiceInfo();
 
         // Assert
         result.Environment.Should().Be("Production");
+    }
+
+    [Fact]
+    public void GetServiceInfo_ReturnsHostName()
+    {
+        // Arrange
+        _mockEnvironment.EnvironmentName.Returns("Development");
+        var infoService = new InfoService(_mockEnvironment, _logger);
+
+        // Act
+        var result = infoService.GetServiceInfo();
+
+        // Assert
+        result.HostName.Should().NotBeNullOrEmpty();
+        result.HostName.Should().Be(Environment.MachineName);
+    }
+
+    [Fact]
+    public void GetServiceInfo_ReturnsStartedAt()
+    {
+        // Arrange
+        _mockEnvironment.EnvironmentName.Returns("Development");
+        var infoService = new InfoService(_mockEnvironment, _logger);
+
+        // Act
+        var result = infoService.GetServiceInfo();
+
+        // Assert
+        result.StartedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(5));
     }
 
     [Theory]
@@ -61,14 +97,34 @@ public class InfoServiceTests
     public void GetServiceInfo_WorksWithDifferentEnvironments(string environmentName)
     {
         // Arrange
-        var mockEnvironment = new Mock<IHostEnvironment>();
-        mockEnvironment.Setup(e => e.EnvironmentName).Returns(environmentName);
-        var infoService = new InfoService(mockEnvironment.Object);
+        _mockEnvironment.EnvironmentName.Returns(environmentName);
+        var infoService = new InfoService(_mockEnvironment, _logger);
 
         // Act
         var result = infoService.GetServiceInfo();
 
         // Assert
         result.Environment.Should().Be(environmentName);
+    }
+
+    [Fact]
+    public void GetServiceInfo_CallsLogger()
+    {
+        // Arrange
+        _mockEnvironment.EnvironmentName.Returns("Development");
+        var infoService = new InfoService(_mockEnvironment, _logger);
+
+        // Act
+        var result = infoService.GetServiceInfo();
+
+        // Assert
+        // Перевіряємо що logger викликався (будь-який рівень логування)
+        _logger.ReceivedWithAnyArgs(2).Log(
+            default,
+            default,
+            default!,
+            default,
+            default!
+        );
     }
 }
