@@ -6,11 +6,13 @@ using Serilog;
 using Serilog.Events;
 using MedocIntegration.Common.Logging;
 using MedocIntegration.Common.Constants;
+using MedocIntegration.Common.Models;
+using MedocIntegration.Common.Configuration;
 using MedocIntegration.Service.Services;
 using MedocIntegration.Service.Endpoints;
 using MedocIntegration.Service.Middleware;
 
-// ✅ Bootstrap logger - єдина конфігурація для файлів
+// Bootstrap logger
 Log.Logger = new LoggerConfiguration()
     .ConfigureFileLogging(
         applicationName: ApplicationConstants.ServiceNames.Service,
@@ -25,7 +27,29 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // ✅ Serilog - використовуємо спільну конфігурацію
+    // Налаштування з appsettings.json
+    var appSettings = builder.Configuration
+        .GetSection(AppSettings.SectionName)
+        .Get<AppSettings>();
+
+    if (appSettings == null)
+    {
+        throw new InvalidOperationException("Не вдалося завантажити AppSettings з конфігурації");
+    }
+
+    // Валідація налаштувань
+    SettingsValidator.ValidateAndThrow(appSettings.Api);
+
+    if (!appSettings.Logging.IsValidLevel())
+    {
+        throw new InvalidOperationException($"Невалідний рівень логування: {appSettings.Logging.MinimumLevel}");
+    }
+
+    Log.Information("Налаштування завантажено: API {Url}, LogLevel {LogLevel}",
+        appSettings.Api.Url,
+        appSettings.Logging.MinimumLevel);
+
+    // Serilog з рівнем логування з налаштувань
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         configuration
@@ -33,10 +57,20 @@ try
             .ReadFrom.Services(services)
             .ConfigureFileLogging(
                 applicationName: ApplicationConstants.ServiceNames.Service,
-                minimumLevel: LogEventLevel.Information,
+                minimumLevel: appSettings.Logging.GetLogLevel(),
                 isDevelopment: context.HostingEnvironment.IsDevelopment()
             );
     });
+
+    // Реєстрація SettingsManager
+    builder.Services.AddSingleton<ISettingsManager>(sp =>
+        new SettingsManager(sp.GetRequiredService<ILogger<SettingsManager>>()));
+
+    // Додавання AppSettings до DI
+    builder.Services.AddSingleton(appSettings);
+
+    // Налаштування URL з конфігурації
+    builder.WebHost.UseUrls(appSettings.Api.Url);
 
     // Windows Service
     builder.Host.UseWindowsService();
@@ -60,7 +94,7 @@ try
 
     var app = builder.Build();
 
-    // ✅ Глобальна обробка помилок (додати на початку pipeline)
+    // Глобальна обробка помилок
     app.UseGlobalExceptionHandler();
 
     // HTTP Request logging
@@ -83,8 +117,7 @@ try
     app.MapHealthEndpoints();
     app.MapInfoEndpoints();
 
-    Log.Information("Service configured successfully, listening on {BaseUrl}",
-        ApplicationConstants.Api.DefaultBaseUrl);
+    Log.Information("Service configured successfully, listening on {Url}", appSettings.Api.Url);
 
     app.Run();
 }
