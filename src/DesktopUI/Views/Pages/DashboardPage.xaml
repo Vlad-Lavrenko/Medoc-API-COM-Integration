@@ -127,7 +127,7 @@
         <!-- БЛОК 3: Кнопка відкриття Scalar         -->
         <!-- ═══════════════════════════════════════ -->
         <Button Grid.Row="4"
-               Style="{StaticResource MaterialDesignRaisedAccentButton}"
+               Style="{StaticResource MaterialDesignRaisedButton}"
                Command="{Binding OpenScalarCommand}"
                HorizontalAlignment="Center"
                Width="280" Height="46"

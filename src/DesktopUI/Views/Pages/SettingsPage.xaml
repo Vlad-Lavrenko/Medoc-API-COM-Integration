@@ -36,7 +36,7 @@
             </Button>
 
             <!-- Записати -->
-            <Button Style="{StaticResource MaterialDesignRaisedAccentButton}"
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
                    Command="{Binding SaveSettingsCommand}"
                    Width="160" Height="46"
                    ToolTip="Зберегти налаштування у файл">

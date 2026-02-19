@@ -15,6 +15,12 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ILogReader _logReader;
     private readonly System.Timers.Timer _refreshTimer;
 
+    // ── Thread-safe Brushes ───────────────────────────
+    private static readonly SolidColorBrush GreenBrush = CreateFrozenBrush(Color.FromRgb(76, 175, 80));
+    private static readonly SolidColorBrush RedBrush = CreateFrozenBrush(Color.FromRgb(244, 67, 54));
+    private static readonly SolidColorBrush OrangeBrush = CreateFrozenBrush(Color.FromRgb(255, 152, 0));
+    private static readonly SolidColorBrush GrayBrush = CreateFrozenBrush(Color.FromRgb(158, 158, 158));
+
     [ObservableProperty]
     private ServiceStatus _currentStatus = new();
 
@@ -25,7 +31,7 @@ public partial class DashboardViewModel : ObservableObject
     private bool _isLoading;
 
     [ObservableProperty]
-    private Brush _statusColor = Brushes.Gray;
+    private Brush _statusColor = GrayBrush;
 
     [ObservableProperty]
     private string _statusIcon = "HelpCircle";
@@ -35,7 +41,6 @@ public partial class DashboardViewModel : ObservableObject
         _serviceController = serviceController;
         _logReader = logReader;
 
-        // Початкове завантаження даних
         _ = InitializeAsync();
 
         // Автооновлення статусу кожні 5 секунд
@@ -150,15 +155,20 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Оновлює статус служби та індикатори
+    /// Оновлює статус служби та індикатори — безпечно з будь-якого потоку
     /// </summary>
     [RelayCommand]
     private async Task RefreshStatusAsync()
     {
         try
         {
-            CurrentStatus = await _serviceController.GetStatusAsync();
-            UpdateStatusIndicators();
+            var status = await _serviceController.GetStatusAsync();
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                CurrentStatus = status;
+                UpdateStatusIndicators();
+            });
         }
         catch (Exception ex)
         {
@@ -176,7 +186,6 @@ public partial class DashboardViewModel : ObservableObject
         {
             var logs = await _logReader.GetRecentLogsAsync(200);
 
-            // Оновлення ObservableCollection з UI потоку
             Application.Current.Dispatcher.Invoke(() =>
             {
                 LogEntries.Clear();
@@ -191,7 +200,7 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Очищає список логів у UI (без видалення файлу)
+    /// Очищає список логів у UI без видалення файлу
     /// </summary>
     [RelayCommand]
     private void ClearLogs() => LogEntries.Clear();
@@ -204,10 +213,9 @@ public partial class DashboardViewModel : ObservableObject
     {
         try
         {
-            var url = "http://localhost:5000/scalar/v1";
             Process.Start(new ProcessStartInfo
             {
-                FileName = url,
+                FileName = "http://localhost:5000/scalar/v1",
                 UseShellExecute = true
             });
         }
@@ -219,21 +227,21 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Оновлює колір та іконку індикатора відповідно до поточного статусу
+    /// Оновлює колір та іконку індикатора — викликати тільки з UI потоку
     /// </summary>
     private void UpdateStatusIndicators()
     {
         StatusColor = CurrentStatus.Status switch
         {
             System.ServiceProcess.ServiceControllerStatus.Running =>
-                new SolidColorBrush(Color.FromRgb(76, 175, 80)),   // Зелений
+                GreenBrush,
             System.ServiceProcess.ServiceControllerStatus.Stopped =>
-                new SolidColorBrush(Color.FromRgb(244, 67, 54)),   // Червоний
+                RedBrush,
             System.ServiceProcess.ServiceControllerStatus.StartPending or
             System.ServiceProcess.ServiceControllerStatus.StopPending =>
-                new SolidColorBrush(Color.FromRgb(255, 152, 0)),   // Оранжевий
+                OrangeBrush,
             _ =>
-                new SolidColorBrush(Color.FromRgb(158, 158, 158))  // Сірий
+                GrayBrush
         };
 
         StatusIcon = CurrentStatus.Status switch
@@ -244,5 +252,15 @@ public partial class DashboardViewModel : ObservableObject
             System.ServiceProcess.ServiceControllerStatus.StopPending => "ProgressClock",
             _ => "HelpCircle"
         };
+    }
+
+    /// <summary>
+    /// Створює та заморожує Brush для безпечного використання з будь-якого потоку
+    /// </summary>
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 }
