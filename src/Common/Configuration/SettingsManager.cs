@@ -9,9 +9,17 @@ namespace MedocIntegration.Common.Configuration;
 public interface ISettingsManager
 {
     string GetSettingsFilePath();
+    bool SettingsFileExists();
+
+    /// <summary>
+    /// Перевіряє наявність файлу налаштувань.
+    /// Якщо файл відсутній — створює його з переданими дефолтними значеннями.
+    /// Повертає актуальні налаштування з файлу.
+    /// </summary>
+    Task<T> EnsureCreatedAsync<T>(T defaults) where T : class;
+
     Task<T?> LoadSettingsAsync<T>() where T : class;
     Task SaveSettingsAsync<T>(T settings) where T : class;
-    bool SettingsFileExists();
 }
 
 public class SettingsManager : ISettingsManager
@@ -45,6 +53,44 @@ public class SettingsManager : ISettingsManager
     public bool SettingsFileExists()
     {
         return File.Exists(GetSettingsFilePath());
+    }
+
+    /// <summary>
+    /// Гарантує існування файлу налаштувань.
+    /// Якщо файл відсутній — записує дефолти та повертає їх.
+    /// Якщо файл існує — читає та повертає поточні значення.
+    /// </summary>
+    public async Task<T> EnsureCreatedAsync<T>(T defaults) where T : class
+    {
+        if (!SettingsFileExists())
+        {
+            _logger.LogInformation(
+                "Файл налаштувань не знайдено. Створюємо з дефолтними значеннями: {Path}",
+                GetSettingsFilePath());
+
+            await SaveSettingsAsync(defaults);
+            return defaults;
+        }
+
+        _logger.LogInformation(
+            "Файл налаштувань знайдено: {Path}",
+            GetSettingsFilePath());
+
+        // Файл є — читаємо актуальні налаштування
+        var existing = await LoadSettingsAsync<T>();
+
+        if (existing is null)
+        {
+            // Файл пошкоджений — перезаписуємо дефолтами
+            _logger.LogWarning(
+                "Файл налаштувань пошкоджено. Відновлюємо з дефолтними значеннями: {Path}",
+                GetSettingsFilePath());
+
+            await SaveSettingsAsync(defaults);
+            return defaults;
+        }
+
+        return existing;
     }
 
     public async Task<T?> LoadSettingsAsync<T>() where T : class

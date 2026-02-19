@@ -23,12 +23,29 @@ public class AppSettings
     /// Шлях до користувацьких налаштувань
     /// </summary>
     public string? UserSettingsPath { get; init; }
+
+    /// <summary>
+    /// Дефолтні налаштування — використовуються при першому запуску
+    /// коли файл налаштувань ще не існує
+    /// </summary>
+    public static AppSettings Default => new()
+    {
+        Api = new ApiSettings
+        {
+            Address = "http://localhost",
+            Port = 5000
+        },
+        Logging = new LoggingSettings
+        {
+            MinimumLevel = "Information"
+        }
+    };
 }
 
 /// <summary>
 /// Налаштування API
 /// </summary>
-public class ApiSettings
+public class ApiSettings 
 {
     /// <summary>
     /// Адреса для прослуховування (наприклад: http://localhost, http://0.0.0.0)

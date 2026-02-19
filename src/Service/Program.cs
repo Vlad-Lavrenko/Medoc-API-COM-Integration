@@ -27,25 +27,27 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Налаштування з appsettings.json
-    var appSettings = builder.Configuration
+    // Налаштування з appsettings.json (дефолти для першого запуску)
+    var appSettingsDefaults = builder.Configuration
         .GetSection(AppSettings.SectionName)
-        .Get<AppSettings>();
+        .Get<AppSettings>() ?? AppSettings.Default;
 
-    if (appSettings == null)
-    {
-        throw new InvalidOperationException("Не вдалося завантажити AppSettings з конфігурації");
-    }
+    // Гарантуємо існування файлу та отримуємо актуальні налаштування
+    // NullLogger — для bootstrap фази до побудови DI контейнера
+    var bootstrapSettingsManager = new SettingsManager(
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<SettingsManager>.Instance);
 
-    // Валідація налаштувань
+    var appSettings = await bootstrapSettingsManager
+        .EnsureCreatedAsync(appSettingsDefaults);
+
+    // Валідація
     SettingsValidator.ValidateAndThrow(appSettings.Api);
 
     if (!appSettings.Logging.IsValidLevel())
-    {
-        throw new InvalidOperationException($"Невалідний рівень логування: {appSettings.Logging.MinimumLevel}");
-    }
+        throw new InvalidOperationException(
+            $"Невалідний рівень логування: {appSettings.Logging.MinimumLevel}");
 
-    Log.Information("Налаштування завантажено: API {Url}, LogLevel {LogLevel}",
+    Log.Information("Налаштування: API {Url}, LogLevel {LogLevel}",
         appSettings.Api.Url,
         appSettings.Logging.MinimumLevel);
 

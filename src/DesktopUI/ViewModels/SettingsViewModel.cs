@@ -40,9 +40,43 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settingsManager = settingsManager;
 
-        // Автоматично завантажуємо налаштування при відкритті
-        _ = LoadSettingsAsync();
+        // Гарантуємо існування файлу та завантажуємо налаштування
+        // БЕЗ MessageBox — це фонова ініціалізація
+        _ = InitializeSettingsAsync();
     }
+
+    /// <summary>
+    /// Ініціалізація: створює файл якщо відсутній, завантажує налаштування у поля форми
+    /// </summary>
+    private async Task InitializeSettingsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+
+            var settings = await _settingsManager.EnsureCreatedAsync(AppSettings.Default);
+
+            ApiAddress = settings.Api.Address;
+            ApiPort = settings.Api.Port;
+            LoggingLevel = settings.Logging.MinimumLevel;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Помилка ініціалізації налаштувань:\n{ex.Message}",
+                "Помилка",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Ручне читання налаштувань з файлу (кнопка "Прочитати")
+    /// </summary>
 
     /// <summary>
     /// Завантажує налаштування з файлу у поля форми
@@ -54,29 +88,18 @@ public partial class SettingsViewModel : ObservableObject
         {
             IsLoading = true;
 
-            var settings = await _settingsManager.LoadSettingsAsync<AppSettings>();
+            var settings = await _settingsManager.EnsureCreatedAsync(AppSettings.Default);
 
-            if (settings != null)
-            {
-                ApiAddress = settings.Api.Address;
-                ApiPort = settings.Api.Port;
-                LoggingLevel = settings.Logging.MinimumLevel;
+            ApiAddress = settings.Api.Address;
+            ApiPort = settings.Api.Port;
+            LoggingLevel = settings.Logging.MinimumLevel;
 
-                MessageBox.Show("Налаштування успішно завантажено", "Успіх",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            else
-            {
-                MessageBox.Show(
-                    "Файл налаштувань не знайдено.\nВикористовуються значення за замовчуванням.",
-                    "Інформація",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
+            MessageBox.Show("Налаштування успішно завантажено", "Успіх",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Помилка завантаження налаштувань:\n{ex.Message}", "Помилка",
+            MessageBox.Show($"Помилка завантаження:\n{ex.Message}", "Помилка",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
