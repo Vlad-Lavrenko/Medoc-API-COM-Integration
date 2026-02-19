@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/Common/Common.csproj" Id="3685ea94-3d97-4384-af2c-6b36c6e94d36" />
+  <Project Path="src/DesktopUI/DesktopUI.csproj" Id="486b8deb-db97-4578-8cb2-3fa0f83fb9ab" />
   <Project Path="src/Service.Tests/Service.Tests.csproj" />
   <Project Path="src/Service/Service.csproj" />
 </Solution>

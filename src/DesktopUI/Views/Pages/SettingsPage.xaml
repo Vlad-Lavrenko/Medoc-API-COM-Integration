@@ -1,0 +1,198 @@
+﻿<UserControl x:Class="MedocIntegration.DesktopUI.Views.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Кнопки -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="*"/>
+            <!-- Налаштування -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- БЛОК 1: Кнопки Прочитати / Записати    -->
+        <!-- ═══════════════════════════════════════ -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal"
+                   HorizontalAlignment="Center">
+
+            <!-- Прочитати -->
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                   Command="{Binding LoadSettingsCommand}"
+                   Width="160" Height="46"
+                   Margin="0,0,16,0"
+                   ToolTip="Завантажити налаштування з файлу">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="FolderOpen"
+                                            Width="22" Height="22"
+                                            Margin="0,0,10,0"
+                                            VerticalAlignment="Center"/>
+                    <TextBlock Text="Прочитати"
+                              FontSize="14"
+                              VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Записати -->
+            <Button Style="{StaticResource MaterialDesignRaisedAccentButton}"
+                   Command="{Binding SaveSettingsCommand}"
+                   Width="160" Height="46"
+                   ToolTip="Зберегти налаштування у файл">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ContentSave"
+                                            Width="22" Height="22"
+                                            Margin="0,0,10,0"
+                                            VerticalAlignment="Center"/>
+                    <TextBlock Text="Записати"
+                              FontSize="14"
+                              VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- БЛОК 2: Групи налаштувань               -->
+        <!-- ═══════════════════════════════════════ -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- ГРУПА 1: API -->
+                <materialDesign:Card Padding="24" Margin="0,0,0,16">
+                    <StackPanel>
+
+                        <!-- Заголовок групи -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <materialDesign:PackIcon Kind="Api"
+                                                    Width="28" Height="28"
+                                                    VerticalAlignment="Center"
+                                                    Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                    Margin="0,0,12,0"/>
+                            <TextBlock Text="API Налаштування"
+                                      Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                                      VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Адреса -->
+                        <TextBox materialDesign:HintAssist.Hint="Адреса сервера"
+                                materialDesign:HintAssist.HelperText="Приклад: http://localhost або http://0.0.0.0"
+                                Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                Text="{Binding ApiAddress, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,20"/>
+
+                        <!-- Порт -->
+                        <TextBox materialDesign:HintAssist.Hint="Порт"
+                                materialDesign:HintAssist.HelperText="Допустимий діапазон: 1 – 65535. За замовчуванням: 5000"
+                                materialDesign:TextFieldAssist.SuffixText="/tcp"
+                                Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                Text="{Binding ApiPort, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,20"/>
+
+                        <!-- Повна URL (readonly) -->
+                        <TextBox materialDesign:HintAssist.Hint="Повна URL адреса"
+                                materialDesign:HintAssist.HelperText="Генерується автоматично"
+                                Style="{StaticResource MaterialDesignFilledTextBox}"
+                                Text="{Binding FullUrl, Mode=OneWay}"
+                                IsReadOnly="True"
+                                FontFamily="Consolas"
+                                Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                    </StackPanel>
+                </materialDesign:Card>
+
+                <!-- ГРУПА 2: Логування -->
+                <materialDesign:Card Padding="24" Margin="0,0,0,16">
+                    <StackPanel>
+
+                        <!-- Заголовок групи -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <materialDesign:PackIcon Kind="FileDocumentOutline"
+                                                    Width="28" Height="28"
+                                                    VerticalAlignment="Center"
+                                                    Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                    Margin="0,0,12,0"/>
+                            <TextBlock Text="Налаштування Логування"
+                                      Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                                      VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Рівень логування -->
+                        <ComboBox materialDesign:HintAssist.Hint="Мінімальний рівень логування"
+                                 materialDesign:HintAssist.HelperText="Information — рекомендовано для продакшену"
+                                 Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                                 ItemsSource="{Binding LoggingLevels}"
+                                 SelectedItem="{Binding LoggingLevel}"
+                                 Margin="0,0,0,16"/>
+
+                        <!-- Опис рівнів -->
+                        <Border Background="{DynamicResource MaterialDesign.Brush.Chip.Background}"
+                               CornerRadius="6"
+                               Padding="16">
+                            <StackPanel>
+                                <TextBlock Text="Опис рівнів:"
+                                          FontWeight="SemiBold"
+                                          Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Verbose" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="— всі деталі виконання"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Debug" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="— відладочна інформація"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Information" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="— загальна інформація ✓"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Warning" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="— попередження"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Error" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="— тільки помилки"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Fatal" FontWeight="Bold" Margin="0,0,12,4"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="— критичні збої"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </materialDesign:Card>
+
+                <!-- ІНФОРМАЦІЙНИЙ БЛОК -->
+                <materialDesign:Card Padding="16"
+                                    Background="{DynamicResource MaterialDesign.Brush.Selection}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                Width="24" Height="24"
+                                                VerticalAlignment="Top"
+                                                Margin="0,0,12,0"/>
+                        <TextBlock TextWrapping="Wrap">
+                            <Run Text="Після збереження необхідно перезапустити службу"
+                                 FontWeight="Bold"/>
+                            <Run Text=" для застосування змін. Файл зберігається у:"/>
+                            <LineBreak/>
+                            <Run Text="C:\ProgramData\MedocIntegration\settings.json"
+                                 FontFamily="Consolas"
+                                 FontSize="12"/>
+                        </TextBlock>
+                    </StackPanel>
+                </materialDesign:Card>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Progress Bar при завантаженні -->
+        <ProgressBar Grid.Row="0" Grid.RowSpan="3"
+                    Style="{StaticResource MaterialDesignLinearProgressBar}"
+                    IsIndeterminate="True"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}"
+                    VerticalAlignment="Top"
+                    Height="4"/>
+    </Grid>
+</UserControl>
