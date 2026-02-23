@@ -67,34 +67,13 @@ Source: "publish\DesktopUI\*"; DestDir: "{app}\DesktopUI"; Flags: ignoreversion 
 ; =============================================================
 [Icons]
 ; =============================================================
-Name: "{group}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"
-Name: "{group}\Uninstall {#AppName}";      Filename: "{uninstallexe}"
+Name: "{group}\Medoc Integration Manager";       Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"
+Name: "{group}\Uninstall {#AppName}";             Filename: "{uninstallexe}"
 Name: "{autodesktop}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"; Tasks: desktopicon
 
 ; =============================================================
 [Run]
 ; =============================================================
-
-; Stop old service if exists (upgrade scenario)
-Filename: "sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Stopping old service..."; Check: ServiceExists
-
-; Delete old service if exists (upgrade scenario)
-Filename: "sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Removing old service..."; Check: ServiceExists
-
-; Short pause so SCM releases the binary
-Filename: "cmd.exe"; Parameters: "/c timeout /t 2 /nobreak"; Flags: runhidden waituntilterminated; Check: ServiceExists
-
-; Register service
-Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= """{app}\{#ExeService}""" start= auto DisplayName= ""{#ServiceDisplay}"""; Flags: runhidden waituntilterminated; StatusMsg: "Registering service..."
-
-; Set service description
-Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""{#ServiceDescr}"""; Flags: runhidden waituntilterminated
-
-; Configure auto-recovery (3 restarts)
-Filename: "{sys}\sc.exe"; Parameters: "failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000"; Flags: runhidden waituntilterminated
-
-; Start service
-Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Starting service..."
 
 ; Launch DesktopUI after install
 Filename: "{app}\{#ExeUI}"; Description: "Launch Medoc Integration Manager"; Flags: nowait postinstall skipifsilent
@@ -103,12 +82,15 @@ Filename: "{app}\{#ExeUI}"; Description: "Launch Medoc Integration Manager"; Fla
 [UninstallRun]
 ; =============================================================
 Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}";   Flags: runhidden waituntilterminated
-Filename: "cmd.exe";        Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidden waituntilterminated
+Filename: "cmd.exe";      Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated
 
 ; =============================================================
 [Code]
 ; =============================================================
+
+var
+  SC: String;
 
 function IsDotNet10Installed(): Boolean;
 var
@@ -120,39 +102,44 @@ begin
 
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
   if RegGetValueNames(HKLM, Key, Names) then
-  begin
     for I := 0 to GetArrayLength(Names) - 1 do
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
-  end;
 
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.NETCore.App';
   if RegGetValueNames(HKLM, Key, Names) then
-  begin
     for I := 0 to GetArrayLength(Names) - 1 do
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
-  end;
 end;
 
 function ServiceExists(): Boolean;
 var
-  ResultCode: Integer;
+  RC: Integer;
 begin
-  Exec(ExpandConstant('{sys}\sc.exe'), 'query {#ServiceName}', '',
-       SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Result := (ResultCode = 0);
+  Exec(SC, 'query {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Result := (RC = 0);
+end;
+
+function ExecSC(Params: String): Boolean;
+var
+  RC: Integer;
+begin
+  Exec(SC, Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Result := (RC = 0);
 end;
 
 function InitializeSetup(): Boolean;
 begin
   Result := True;
+  SC := ExpandConstant('{sys}\sc.exe');
+
   if not IsDotNet10Installed() then
   begin
     if MsgBox(
@@ -164,6 +151,43 @@ begin
       'Continue installation without .NET 10?',
       mbConfirmation, MB_YESNO) = IDNO then
       Result := False;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  BinPath: String;
+  RC: Integer;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    SC := ExpandConstant('{sys}\sc.exe');
+    BinPath := ExpandConstant('{app}\{#ExeService}');
+
+    // Stop + delete old service if exists (upgrade)
+    if ServiceExists() then
+    begin
+      ExecSC('stop {#ServiceName}');
+      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
+      ExecSC('delete {#ServiceName}');
+      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    end;
+
+    // Register new service
+    // binPath= with quoted path handles spaces in program files
+    ExecSC('create {#ServiceName}'
+      + ' binPath= "' + BinPath + '"'
+      + ' start= auto'
+      + ' DisplayName= "{#ServiceDisplay}"');
+
+    // Set description
+    ExecSC('description {#ServiceName} "{#ServiceDescr}"');
+
+    // Configure auto-recovery on failure
+    ExecSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
+
+    // Start the service
+    ExecSC('start {#ServiceName}');
   end;
 end;
 
