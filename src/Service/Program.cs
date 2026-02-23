@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -12,7 +12,7 @@ using MedocIntegration.Service.Services;
 using MedocIntegration.Service.Endpoints;
 using MedocIntegration.Service.Middleware;
 
-// Bootstrap logger
+// Bootstrap logger - file only, no console (Windows Service has no console)
 Log.Logger = new LoggerConfiguration()
     .ConfigureFileLogging(
         applicationName: ApplicationConstants.ServiceNames.Service,
@@ -27,31 +27,54 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Налаштування з appsettings.json (дефолти для першого запуску)
+    // === MUST BE FIRST: tells ASP.NET Core this is a Windows Service ===
+    // This must come before UseSerilog, UseUrls or any other host configuration
+    builder.Host.UseWindowsService();
+
+    // Read defaults from appsettings.json
     var appSettingsDefaults = builder.Configuration
         .GetSection(AppSettings.SectionName)
         .Get<AppSettings>() ?? AppSettings.Default;
 
-    // Гарантуємо існування файлу та отримуємо актуальні налаштування
-    // NullLogger — для bootstrap фази до побудови DI контейнера
+    // Ensure settings file exists in ProgramData and get actual settings
     var bootstrapSettingsManager = new SettingsManager(
         Microsoft.Extensions.Logging.Abstractions.NullLogger<SettingsManager>.Instance);
 
-    var appSettings = await bootstrapSettingsManager
-        .EnsureCreatedAsync(appSettingsDefaults);
+    AppSettings appSettings;
+    try
+    {
+        appSettings = await bootstrapSettingsManager
+            .EnsureCreatedAsync(appSettingsDefaults);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Failed to load settings, using defaults");
+        appSettings = appSettingsDefaults;
+    }
 
-    // Валідація
-    SettingsValidator.ValidateAndThrow(appSettings.Api);
+    // Validate settings
+    try
+    {
+        SettingsValidator.ValidateAndThrow(appSettings.Api);
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Settings validation failed, using defaults");
+        appSettings = appSettingsDefaults;
+    }
 
     if (!appSettings.Logging.IsValidLevel())
-        throw new InvalidOperationException(
-            $"Невалідний рівень логування: {appSettings.Logging.MinimumLevel}");
+    {
+        Log.Warning("Invalid log level '{Level}', falling back to Information",
+            appSettings.Logging.MinimumLevel);
+        appSettings = appSettingsDefaults;
+    }
 
-    Log.Information("Налаштування: API {Url}, LogLevel {LogLevel}",
+    Log.Information("Settings loaded: API {Url}, LogLevel {LogLevel}",
         appSettings.Api.Url,
         appSettings.Logging.MinimumLevel);
 
-    // Serilog з рівнем логування з налаштувань
+    // Serilog - after UseWindowsService
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         configuration
@@ -64,18 +87,15 @@ try
             );
     });
 
-    // Реєстрація SettingsManager
+    // Register SettingsManager
     builder.Services.AddSingleton<ISettingsManager>(sp =>
         new SettingsManager(sp.GetRequiredService<ILogger<SettingsManager>>()));
 
-    // Додавання AppSettings до DI
+    // Register AppSettings
     builder.Services.AddSingleton(appSettings);
 
-    // Налаштування URL з конфігурації
+    // Configure URL - after UseWindowsService
     builder.WebHost.UseUrls(appSettings.Api.Url);
-
-    // Windows Service
-    builder.Host.UseWindowsService();
 
     // OpenAPI
     builder.Services.AddEndpointsApiExplorer();
@@ -90,32 +110,27 @@ try
         options.Title = "Medoc API";
     });
 
-    // Реєстрація сервісів
+    // Application services
     builder.Services.AddSingleton<IHealthService, HealthService>();
     builder.Services.AddSingleton<IInfoService, InfoService>();
 
     var app = builder.Build();
 
-    // Глобальна обробка помилок
     app.UseGlobalExceptionHandler();
 
-    // HTTP Request logging
     app.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
         options.GetLevel = (httpContext, elapsed, ex) => LogEventLevel.Information;
     });
 
-    // OpenAPI
     app.MapOpenApi();
 
-    // Scalar
     app.MapScalarApiReference(options =>
     {
         options.OpenApiRoutePattern = "/openapi/{documentName}.json";
     });
 
-    // Endpoints
     app.MapHealthEndpoints();
     app.MapInfoEndpoints();
 
