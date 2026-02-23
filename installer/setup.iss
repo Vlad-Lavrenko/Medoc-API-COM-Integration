@@ -154,10 +154,12 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  BinPath, Params: String;
+  BinPath: String;
+  Params: String;
   RC: Integer;
 begin
-  if CurStep <> ssPostInstall then Exit;
+  if CurStep <> ssPostInstall then
+    Exit;
 
   BinPath := ExpandConstant('{app}\{#ExeService}');
 
@@ -171,7 +173,6 @@ begin
 
   Params := 'create {#ServiceName} binPath= "' + BinPath + '" start= auto DisplayName= "{#ServiceDisplay}"';
   RunSC(Params);
-
   RunSC('description {#ServiceName} "{#ServiceDescr}"');
   RunSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
   RunSC('start {#ServiceName}');
