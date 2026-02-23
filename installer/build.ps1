@@ -1,11 +1,9 @@
-# =============================================================
-# build.ps1 — збірка та компіляція інсталятора
+# build.ps1 - Build and compile installer
 # Medoc API COM Integration
-# =============================================================
-# Використання:
-#   .\build.ps1              — publish + compile installer
-#   .\build.ps1 -SkipInno   — тільки dotnet publish (без компіляції)
-# =============================================================
+#
+# Usage:
+#   .\build.ps1            - publish + compile installer
+#   .\build.ps1 -SkipInno  - only dotnet publish (no compile)
 
 param(
     [switch]$SkipInno = $false
@@ -13,21 +11,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Шляхи ────────────────────────────────────────────────────
+# Paths
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir    = Split-Path -Parent $ScriptDir
 $PublishDir = Join-Path $ScriptDir "publish"
 $OutputDir  = Join-Path $ScriptDir "output"
 
 Write-Host ""
-Write-Host "=================================================" -ForegroundColor Cyan
-Write-Host "  Medoc API COM Integration — Build Installer" -ForegroundColor Cyan
-Write-Host "=================================================" -ForegroundColor Cyan
+Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "  Medoc API COM Integration - Build Installer"  -ForegroundColor Cyan
+Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Очищення ─────────────────────────────────────────────────
+# --- Clean publish dir ---
 if (Test-Path $PublishDir) {
-    Write-Host "[1/5] Очищення publish директорії..." -ForegroundColor Yellow
+    Write-Host "[1/5] Cleaning publish directory..." -ForegroundColor Yellow
     Remove-Item $PublishDir -Recurse -Force
 }
 
@@ -35,8 +33,8 @@ New-Item -ItemType Directory -Force -Path "$PublishDir\Service"   | Out-Null
 New-Item -ItemType Directory -Force -Path "$PublishDir\DesktopUI" | Out-Null
 New-Item -ItemType Directory -Force -Path $OutputDir              | Out-Null
 
-# ── Publish Service ───────────────────────────────────────────
-Write-Host "[2/5] Публікація Service..." -ForegroundColor Yellow
+# --- Publish Service ---
+Write-Host "[2/5] Publishing Service..." -ForegroundColor Yellow
 
 dotnet publish "$RootDir\src\Service\Service.csproj" `
     -c Release `
@@ -47,14 +45,14 @@ dotnet publish "$RootDir\src\Service\Service.csproj" `
     --nologo
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ПОМИЛКА: Публікація Service завершилась з помилкою!" -ForegroundColor Red
+    Write-Host "ERROR: Service publish failed!" -ForegroundColor Red
     exit 1
 }
-Write-Host "Service опубліковано успішно" -ForegroundColor Green
+Write-Host "Service published successfully" -ForegroundColor Green
 Write-Host ""
 
-# ── Publish DesktopUI ─────────────────────────────────────────
-Write-Host "[3/5] Публікація DesktopUI..." -ForegroundColor Yellow
+# --- Publish DesktopUI ---
+Write-Host "[3/5] Publishing DesktopUI..." -ForegroundColor Yellow
 
 dotnet publish "$RootDir\src\DesktopUI\DesktopUI.csproj" `
     -c Release `
@@ -65,30 +63,30 @@ dotnet publish "$RootDir\src\DesktopUI\DesktopUI.csproj" `
     --nologo
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ПОМИЛКА: Публікація DesktopUI завершилась з помилкою!" -ForegroundColor Red
+    Write-Host "ERROR: DesktopUI publish failed!" -ForegroundColor Red
     exit 1
 }
-Write-Host "DesktopUI опубліковано успішно" -ForegroundColor Green
+Write-Host "DesktopUI published successfully" -ForegroundColor Green
 Write-Host ""
 
-# ── Перевірка розміру publish ─────────────────────────────────
-$ServiceSize  = (Get-ChildItem "$PublishDir\Service"   -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-$DesktopSize  = (Get-ChildItem "$PublishDir\DesktopUI" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-Write-Host "Розмір publish:" -ForegroundColor Gray
+# --- Show publish sizes ---
+$ServiceSize = (Get-ChildItem "$PublishDir\Service"   -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+$DesktopSize = (Get-ChildItem "$PublishDir\DesktopUI" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+Write-Host "Publish sizes:" -ForegroundColor Gray
 Write-Host "  Service:   $([math]::Round($ServiceSize,  1)) MB" -ForegroundColor Gray
 Write-Host "  DesktopUI: $([math]::Round($DesktopSize, 1)) MB" -ForegroundColor Gray
 Write-Host ""
 
-# ── Компіляція Inno Setup ─────────────────────────────────────
+# --- Compile Inno Setup ---
 if ($SkipInno) {
-    Write-Host "[4/5] Пропускаємо компіляцію Inno Setup (-SkipInno)" -ForegroundColor Gray
+    Write-Host "[4/5] Skipping Inno Setup compile (-SkipInno)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "=== PUBLISH ЗАВЕРШЕНО ==="       -ForegroundColor Green
-    Write-Host "Файли знаходяться у: $PublishDir" -ForegroundColor Cyan
+    Write-Host "=== PUBLISH COMPLETE ==="            -ForegroundColor Green
+    Write-Host "Files are located in: $PublishDir"  -ForegroundColor Cyan
     exit 0
 }
 
-Write-Host "[4/5] Пошук Inno Setup компілятора..." -ForegroundColor Yellow
+Write-Host "[4/5] Searching for Inno Setup compiler..." -ForegroundColor Yellow
 
 $InnoCompiler = ""
 $PossiblePaths = @(
@@ -104,28 +102,28 @@ foreach ($Path in $PossiblePaths) {
 }
 
 if ($InnoCompiler -eq "") {
-    Write-Host "УВАГА: Inno Setup 6 не знайдено." -ForegroundColor Yellow
-    Write-Host "Завантажте з: https://jrsoftware.org/isinfo.php" -ForegroundColor Yellow
+    Write-Host "WARNING: Inno Setup 6 not found." -ForegroundColor Yellow
+    Write-Host "Download from: https://jrsoftware.org/isinfo.php" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Publish файли збережено у: $PublishDir" -ForegroundColor Cyan
-    Write-Host "Після встановлення Inno Setup запустіть build.ps1 повторно." -ForegroundColor Cyan
+    Write-Host "Publish files saved to: $PublishDir" -ForegroundColor Cyan
+    Write-Host "After installing Inno Setup run build.ps1 again." -ForegroundColor Cyan
     exit 0
 }
 
-Write-Host "Знайдено: $InnoCompiler" -ForegroundColor Green
+Write-Host "Found: $InnoCompiler" -ForegroundColor Green
 Write-Host ""
-Write-Host "[5/5] Компіляція інсталятора..." -ForegroundColor Yellow
+Write-Host "[5/5] Compiling installer..." -ForegroundColor Yellow
 
 & $InnoCompiler "$ScriptDir\setup.iss" /O"$OutputDir"
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ПОМИЛКА: Компіляція інсталятора завершилась з помилкою!" -ForegroundColor Red
+    Write-Host "ERROR: Installer compilation failed!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host ""
+Write-Host "" 
 Write-Host "================================================" -ForegroundColor Green
-Write-Host "  ЗБІРКА ЗАВЕРШЕНА УСПІШНО!"                     -ForegroundColor Green
+Write-Host "  BUILD COMPLETE!"                               -ForegroundColor Green
 Write-Host "================================================" -ForegroundColor Green
-Write-Host "  Інсталятор: $OutputDir\MedocIntegration_Setup_1.0.0.exe" -ForegroundColor Cyan
+Write-Host "  Installer: $OutputDir\MedocIntegration_Setup_1.0.0.exe" -ForegroundColor Cyan
 Write-Host ""
