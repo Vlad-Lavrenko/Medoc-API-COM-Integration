@@ -74,23 +74,39 @@ Name: "{autodesktop}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Com
 ; =============================================================
 [Run]
 ; =============================================================
-
-; Launch DesktopUI after install
 Filename: "{app}\{#ExeUI}"; Description: "Launch Medoc Integration Manager"; Flags: nowait postinstall skipifsilent
 
 ; =============================================================
 [UninstallRun]
 ; =============================================================
-Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}";   Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}";     Flags: runhidden waituntilterminated
 Filename: "cmd.exe";      Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidden waituntilterminated
-Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}";   Flags: runhidden waituntilterminated
 
 ; =============================================================
 [Code]
 ; =============================================================
 
+function GetSC(): String;
+begin
+  Result := ExpandConstant('{sys}\sc.exe');
+end;
+
+function RunSC(Params: String): Boolean;
 var
-  SC: String;
+  RC: Integer;
+begin
+  Exec(GetSC(), Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Result := (RC = 0);
+end;
+
+function ServiceExists(): Boolean;
+var
+  RC: Integer;
+begin
+  Exec(GetSC(), 'query {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Result := (RC = 0);
+end;
 
 function IsDotNet10Installed(): Boolean;
 var
@@ -119,27 +135,9 @@ begin
       end;
 end;
 
-function ServiceExists(): Boolean;
-var
-  RC: Integer;
-begin
-  Exec(SC, 'query {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, RC);
-  Result := (RC = 0);
-end;
-
-function ExecSC(Params: String): Boolean;
-var
-  RC: Integer;
-begin
-  Exec(SC, Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
-  Result := (RC = 0);
-end;
-
 function InitializeSetup(): Boolean;
 begin
   Result := True;
-  SC := ExpandConstant('{sys}\sc.exe');
-
   if not IsDotNet10Installed() then
   begin
     if MsgBox(
@@ -156,39 +154,27 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  BinPath: String;
+  BinPath, Params: String;
   RC: Integer;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep <> ssPostInstall then Exit;
+
+  BinPath := ExpandConstant('{app}\{#ExeService}');
+
+  if ServiceExists() then
   begin
-    SC := ExpandConstant('{sys}\sc.exe');
-    BinPath := ExpandConstant('{app}\{#ExeService}');
-
-    // Stop + delete old service if exists (upgrade)
-    if ServiceExists() then
-    begin
-      ExecSC('stop {#ServiceName}');
-      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
-      ExecSC('delete {#ServiceName}');
-      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
-    end;
-
-    // Register new service
-    // binPath= with quoted path handles spaces in program files
-    ExecSC('create {#ServiceName}'
-      + ' binPath= "' + BinPath + '"'
-      + ' start= auto'
-      + ' DisplayName= "{#ServiceDisplay}"');
-
-    // Set description
-    ExecSC('description {#ServiceName} "{#ServiceDescr}"');
-
-    // Configure auto-recovery on failure
-    ExecSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
-
-    // Start the service
-    ExecSC('start {#ServiceName}');
+    RunSC('stop {#ServiceName}');
+    Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    RunSC('delete {#ServiceName}');
+    Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
   end;
+
+  Params := 'create {#ServiceName} binPath= "' + BinPath + '" start= auto DisplayName= "{#ServiceDisplay}"';
+  RunSC(Params);
+
+  RunSC('description {#ServiceName} "{#ServiceDescr}"');
+  RunSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
+  RunSC('start {#ServiceName}');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
