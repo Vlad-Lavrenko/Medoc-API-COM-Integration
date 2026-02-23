@@ -23,25 +23,19 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/issues
 AppUpdatesURL={#AppURL}/releases
-
 DefaultDirName={autopf}\MedocIntegration
 DefaultGroupName={#AppName}
 OutputDir=output
 OutputBaseFilename=MedocIntegration_Setup_{#AppVersion}
-
 WizardStyle=modern
 PrivilegesRequired=admin
 AllowNoIcons=yes
-
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-
 UninstallDisplayIcon={app}\{#ExeUI}
-
 Compression=lzma2/ultra64
 SolidCompression=yes
 DiskSpanning=no
-
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Installer
@@ -87,7 +81,7 @@ Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}";   Flags: runhidde
 [Code]
 ; =============================================================
 
-function GetSC(): String;
+function GetSC: String;
 begin
   Result := ExpandConstant('{sys}\sc.exe');
 end;
@@ -96,19 +90,19 @@ function RunSC(Params: String): Boolean;
 var
   RC: Integer;
 begin
-  Exec(GetSC(), Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(GetSC, Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
   Result := (RC = 0);
 end;
 
-function ServiceExists(): Boolean;
+function ServiceExists: Boolean;
 var
   RC: Integer;
 begin
-  Exec(GetSC(), 'query {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(GetSC, 'query {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, RC);
   Result := (RC = 0);
 end;
 
-function IsDotNet10Installed(): Boolean;
+function IsDotNet10Installed: Boolean;
 var
   Key: String;
   Names: TArrayOfString;
@@ -135,10 +129,10 @@ begin
       end;
 end;
 
-function InitializeSetup(): Boolean;
+function InitializeSetup: Boolean;
 begin
   Result := True;
-  if not IsDotNet10Installed() then
+  if not IsDotNet10Installed then
   begin
     if MsgBox(
       '.NET 10 Runtime was not found on this computer.' + #13#10 + #13#10 +
@@ -163,7 +157,7 @@ begin
 
   BinPath := ExpandConstant('{app}\{#ExeService}');
 
-  if ServiceExists() then
+  if ServiceExists then
   begin
     RunSC('stop {#ServiceName}');
     Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
