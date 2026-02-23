@@ -13,9 +13,7 @@
 #define ExeService     "Service\Service.exe"
 #define ExeUI          "DesktopUI\DesktopUI.exe"
 
-; =============================================================
 [Setup]
-; =============================================================
 AppId={{F3A7C2E1-B894-4D56-9A3F-7E8C1D2B5F90}}
 AppName={#AppName}
 AppVersion={#AppVersion}
@@ -42,45 +40,30 @@ VersionInfoDescription={#AppName} Installer
 VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
 
-; =============================================================
 [Languages]
-; =============================================================
 Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 
-; =============================================================
 [Tasks]
-; =============================================================
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional options:"; Flags: checkedonce
 
-; =============================================================
 [Files]
-; =============================================================
 Source: "publish\Service\*";   DestDir: "{app}\Service";   Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "publish\DesktopUI\*"; DestDir: "{app}\DesktopUI"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; =============================================================
 [Icons]
-; =============================================================
 Name: "{group}\Medoc Integration Manager";       Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"
 Name: "{group}\Uninstall {#AppName}";             Filename: "{uninstallexe}"
 Name: "{autodesktop}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"; Tasks: desktopicon
 
-; =============================================================
 [Run]
-; =============================================================
 Filename: "{app}\{#ExeUI}"; Description: "Launch Medoc Integration Manager"; Flags: nowait postinstall skipifsilent
 
-; =============================================================
 [UninstallRun]
-; =============================================================
 Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}";     Flags: runhidden waituntilterminated
 Filename: "cmd.exe";      Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}";   Flags: runhidden waituntilterminated
 
-; =============================================================
 [Code]
-; =============================================================
-
 function GetSC: String;
 begin
   Result := ExpandConstant('{sys}\sc.exe');
@@ -112,21 +95,29 @@ begin
 
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
   if RegGetValueNames(HKLM, Key, Names) then
+  begin
     for I := 0 to GetArrayLength(Names) - 1 do
+    begin
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
+    end;
+  end;
 
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.NETCore.App';
   if RegGetValueNames(HKLM, Key, Names) then
+  begin
     for I := 0 to GetArrayLength(Names) - 1 do
+    begin
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
+    end;
+  end;
 end;
 
 function InitializeSetup: Boolean;
@@ -142,7 +133,9 @@ begin
       'Download: https://dotnet.microsoft.com/download/dotnet/10.0' + #13#10 + #13#10 +
       'Continue installation without .NET 10?',
       mbConfirmation, MB_YESNO) = IDNO then
+    begin
       Result := False;
+    end;
   end;
 end;
 
@@ -152,33 +145,35 @@ var
   Params: String;
   RC: Integer;
 begin
-  if CurStep <> ssPostInstall then
-    Exit;
-
-  BinPath := ExpandConstant('{app}\{#ExeService}');
-
-  if ServiceExists then
+  if CurStep = ssPostInstall then
   begin
-    RunSC('stop {#ServiceName}');
-    Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
-    RunSC('delete {#ServiceName}');
-    Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
-  end;
+    BinPath := ExpandConstant('{app}\{#ExeService}');
 
-  Params := 'create {#ServiceName} binPath= "' + BinPath + '" start= auto DisplayName= "{#ServiceDisplay}"';
-  RunSC(Params);
-  RunSC('description {#ServiceName} "{#ServiceDescr}"');
-  RunSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
-  RunSC('start {#ServiceName}');
+    if ServiceExists then
+    begin
+      RunSC('stop {#ServiceName}');
+      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
+      RunSC('delete {#ServiceName}');
+      Exec('cmd.exe', '/c timeout /t 2 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    end;
+
+    Params := 'create {#ServiceName} binPath= "' + BinPath + '" start= auto DisplayName= "{#ServiceDisplay}"';
+    RunSC(Params);
+    RunSC('description {#ServiceName} "{#ServiceDescr}"');
+    RunSC('failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000');
+    RunSC('start {#ServiceName}');
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
+  begin
     MsgBox(
       '{#AppName} has been successfully uninstalled.' + #13#10 + #13#10 +
       'Settings file is preserved at:' + #13#10 +
       'C:\ProgramData\MedocIntegration\settings.json' + #13#10 + #13#10 +
       'You can delete it manually if no longer needed.',
       mbInformation, MB_OK);
+  end;
 end;
