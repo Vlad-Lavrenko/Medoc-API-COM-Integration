@@ -1,5 +1,5 @@
 ; =============================================================
-; setup.iss — Inno Setup Script
+; setup.iss - Inno Setup Script
 ; Medoc API COM Integration
 ; =============================================================
 
@@ -9,7 +9,7 @@
 #define AppURL         "https://github.com/Vlad-Lavrenko/Medoc-API-COM-Integration"
 #define ServiceName    "MedocIntegrationService"
 #define ServiceDisplay "Medoc Integration Service"
-#define ServiceDescr   "REST API сервіс для інтеграції з M.E.Doc через COM-інтерфейс"
+#define ServiceDescr   "REST API service for M.E.Doc COM integration"
 #define ExeService     "Service\Service.exe"
 #define ExeUI          "DesktopUI\DesktopUI.exe"
 
@@ -24,30 +24,24 @@ AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/issues
 AppUpdatesURL={#AppURL}/releases
 
-; Директорії
 DefaultDirName={autopf}\MedocIntegration
 DefaultGroupName={#AppName}
 OutputDir=output
 OutputBaseFilename=MedocIntegration_Setup_{#AppVersion}
 
-; Вигляд та права
 WizardStyle=modern
 PrivilegesRequired=admin
 AllowNoIcons=yes
 
-; 64-бітна архітектура
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-; Іконка у "Додати/видалити програми"
 UninstallDisplayIcon={app}\{#ExeUI}
 
-; Стиснення
 Compression=lzma2/ultra64
 SolidCompression=yes
 DiskSpanning=no
 
-; Інформація про версію
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Installer
@@ -62,118 +56,60 @@ Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 ; =============================================================
 [Tasks]
 ; =============================================================
-Name: "desktopicon"; \
-    Description: "Створити ярлик на робочому столі"; \
-    GroupDescription: "Додаткові параметри:"; \
-    Flags: checked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional options:"; Flags: checkedonce
 
 ; =============================================================
 [Files]
 ; =============================================================
-
-; Service файли
-Source: "publish\Service\*"; \
-    DestDir: "{app}\Service"; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
-
-; DesktopUI файли
-Source: "publish\DesktopUI\*"; \
-    DestDir: "{app}\DesktopUI"; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "publish\Service\*";   DestDir: "{app}\Service";   Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "publish\DesktopUI\*"; DestDir: "{app}\DesktopUI"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; =============================================================
 [Icons]
 ; =============================================================
-
-; Меню Пуск
-Name: "{group}\Medoc Integration Manager"; \
-    Filename: "{app}\{#ExeUI}"; \
-    Comment: "Керування Medoc Integration Service"
-
-Name: "{group}\Видалити {#AppName}"; \
-    Filename: "{uninstallexe}"
-
-; Ярлик на робочому столі
-Name: "{autodesktop}\Medoc Integration Manager"; \
-    Filename: "{app}\{#ExeUI}"; \
-    Comment: "Керування Medoc Integration Service"; \
-    Tasks: desktopicon
+Name: "{group}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"
+Name: "{group}\Uninstall {#AppName}";      Filename: "{uninstallexe}"
+Name: "{autodesktop}\Medoc Integration Manager"; Filename: "{app}\{#ExeUI}"; Comment: "Manage Medoc Integration Service"; Tasks: desktopicon
 
 ; =============================================================
 [Run]
 ; =============================================================
 
-; Зупинка старої служби (при оновленні)
-Filename: "sc.exe"; \
-    Parameters: "stop {#ServiceName}"; \
-    Flags: runhidden waituntilterminated; \
-    StatusMsg: "Зупинка старої служби..."; \
-    Check: ServiceExists
+; Stop old service if exists (upgrade scenario)
+Filename: "sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Stopping old service..."; Check: ServiceExists
 
-; Видалення старої служби (при оновленні)
-Filename: "sc.exe"; \
-    Parameters: "delete {#ServiceName}"; \
-    Flags: runhidden waituntilterminated; \
-    StatusMsg: "Видалення старої служби..."; \
-    Check: ServiceExists
+; Delete old service if exists (upgrade scenario)
+Filename: "sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Removing old service..."; Check: ServiceExists
 
-; Пауза після видалення
-Filename: "cmd.exe"; \
-    Parameters: "/c timeout /t 2 /nobreak"; \
-    Flags: runhidden waituntilterminated; \
-    Check: ServiceExists
+; Short pause so SCM releases the binary
+Filename: "cmd.exe"; Parameters: "/c timeout /t 2 /nobreak"; Flags: runhidden waituntilterminated; Check: ServiceExists
 
-; Реєстрація служби
-Filename: "sc.exe"; \
-    Parameters: "create {#ServiceName} binPath= """"{{app}}\{#ExeService}"""" start= auto DisplayName= """"{{#ServiceDisplay}}"""""; \
-    Flags: runhidden waituntilterminated; \
-    StatusMsg: "Реєстрація служби..."
+; Register service
+Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= """{app}\{#ExeService}""" start= auto DisplayName= ""{#ServiceDisplay}"""; Flags: runhidden waituntilterminated; StatusMsg: "Registering service..."
 
-; Опис служби
-Filename: "sc.exe"; \
-    Parameters: "description {#ServiceName} """"{#ServiceDescr}"""""; \
-    Flags: runhidden waituntilterminated
+; Set service description
+Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""{#ServiceDescr}"""; Flags: runhidden waituntilterminated
 
-; Налаштування автовідновлення після збою (3 спроби)
-Filename: "sc.exe"; \
-    Parameters: "failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000"; \
-    Flags: runhidden waituntilterminated
+; Configure auto-recovery (3 restarts)
+Filename: "{sys}\sc.exe"; Parameters: "failure {#ServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/30000"; Flags: runhidden waituntilterminated
 
-; Запуск служби
-Filename: "sc.exe"; \
-    Parameters: "start {#ServiceName}"; \
-    Flags: runhidden waituntilterminated; \
-    StatusMsg: "Запуск служби..."
+; Start service
+Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Starting service..."
 
-; Запуск DesktopUI після установки
-Filename: "{app}\{#ExeUI}"; \
-    Description: "Запустити Medoc Integration Manager"; \
-    Flags: nowait postinstall skipifsilent
+; Launch DesktopUI after install
+Filename: "{app}\{#ExeUI}"; Description: "Launch Medoc Integration Manager"; Flags: nowait postinstall skipifsilent
 
 ; =============================================================
 [UninstallRun]
 ; =============================================================
-
-; Зупинка служби
-Filename: "sc.exe"; \
-    Parameters: "stop {#ServiceName}"; \
-    Flags: runhidden waituntilterminated
-
-; Очікування зупинки
-Filename: "cmd.exe"; \
-    Parameters: "/c timeout /t 3 /nobreak"; \
-    Flags: runhidden waituntilterminated
-
-; Видалення служби
-Filename: "sc.exe"; \
-    Parameters: "delete {#ServiceName}"; \
-    Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}";   Flags: runhidden waituntilterminated
+Filename: "cmd.exe";        Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated
 
 ; =============================================================
 [Code]
 ; =============================================================
 
-/// Перевіряє наявність .NET 10 Runtime
 function IsDotNet10Installed(): Boolean;
 var
   Key: String;
@@ -182,76 +118,62 @@ var
 begin
   Result := False;
 
-  // Перевірка Microsoft.WindowsDesktop.App (WPF)
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
   if RegGetValueNames(HKLM, Key, Names) then
   begin
     for I := 0 to GetArrayLength(Names) - 1 do
-    begin
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
-    end;
   end;
 
-  // Резервна перевірка Microsoft.NETCore.App
   Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.NETCore.App';
   if RegGetValueNames(HKLM, Key, Names) then
   begin
     for I := 0 to GetArrayLength(Names) - 1 do
-    begin
       if Copy(Names[I], 1, 3) = '10.' then
       begin
         Result := True;
         Exit;
       end;
-    end;
   end;
 end;
 
-/// Перевіряє чи існує Windows Service з такою назвою
 function ServiceExists(): Boolean;
 var
   ResultCode: Integer;
 begin
-  Exec('sc.exe', 'query {#ServiceName}', '', SW_HIDE,
-       ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'query {#ServiceName}', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := (ResultCode = 0);
 end;
 
-/// Ініціалізація — перевірка .NET 10 перед установкою
 function InitializeSetup(): Boolean;
 begin
   Result := True;
-
   if not IsDotNet10Installed() then
   begin
     if MsgBox(
-      '.NET 10 Runtime не знайдено на цьому компютері.' + #13#10 + #13#10 +
-      'Для роботи програми необхідно встановити:' + #13#10 +
-      '  • .NET 10 Desktop Runtime (x64) — для DesktopUI' + #13#10 +
-      '  • .NET 10 Runtime (x64)         — для служби' + #13#10 + #13#10 +
-      'Завантажити: https://dotnet.microsoft.com/download/dotnet/10.0' + #13#10 + #13#10 +
-      'Продовжити встановку без .NET 10?',
+      '.NET 10 Runtime was not found on this computer.' + #13#10 + #13#10 +
+      'The application requires:' + #13#10 +
+      '  - .NET 10 Desktop Runtime (x64) for DesktopUI' + #13#10 +
+      '  - .NET 10 Runtime (x64) for the service' + #13#10 + #13#10 +
+      'Download: https://dotnet.microsoft.com/download/dotnet/10.0' + #13#10 + #13#10 +
+      'Continue installation without .NET 10?',
       mbConfirmation, MB_YESNO) = IDNO then
-    begin
       Result := False;
-    end;
   end;
 end;
 
-/// Повідомлення після видалення
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
-  begin
     MsgBox(
-      '{#AppName} успішно видалено.' + #13#10 + #13#10 +
-      'Файл налаштувань збережено у:' + #13#10 +
+      '{#AppName} has been successfully uninstalled.' + #13#10 + #13#10 +
+      'Settings file is preserved at:' + #13#10 +
       'C:\ProgramData\MedocIntegration\settings.json' + #13#10 + #13#10 +
-      'Ви можете видалити його вручну за необхідності.',
+      'You can delete it manually if no longer needed.',
       mbInformation, MB_OK);
-  end;
 end;
