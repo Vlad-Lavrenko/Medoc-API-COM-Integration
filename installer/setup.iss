@@ -13,6 +13,10 @@
 #define ExeService     "Service\Service.exe"
 #define ExeUI          "DesktopUI\DesktopUI.exe"
 
+; Download URLs for .NET 10 runtimes (aka.ms always points to latest patch)
+#define UrlAspNet  "https://aka.ms/dotnet/10.0/aspnetcore-runtime-win-x64.exe"
+#define UrlDesktop "https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe"
+
 [Setup]
 AppId={{F3A7C2E1-B894-4D56-9A3F-7E8C1D2B5F90}}
 AppName={#AppName}
@@ -64,6 +68,9 @@ Filename: "cmd.exe";      Parameters: "/c timeout /t 3 /nobreak"; Flags: runhidd
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}";   Flags: runhidden waituntilterminated
 
 [Code]
+
+{ ---- Helpers ---- }
+
 function GetSC: String;
 begin
   Result := ExpandConstant('{sys}\sc.exe');
@@ -85,28 +92,16 @@ begin
   Result := (RC = 0);
 end;
 
-function IsDotNet10Installed: Boolean;
+{ ---- .NET runtime checks ---- }
+
+function IsRuntime10Installed(SharedFxName: String): Boolean;
 var
   Key: String;
   Names: TArrayOfString;
   I: Integer;
 begin
   Result := False;
-
-  Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
-  if RegGetValueNames(HKLM, Key, Names) then
-  begin
-    for I := 0 to GetArrayLength(Names) - 1 do
-    begin
-      if Copy(Names[I], 1, 3) = '10.' then
-      begin
-        Result := True;
-        Exit;
-      end;
-    end;
-  end;
-
-  Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.NETCore.App';
+  Key := 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\' + SharedFxName;
   if RegGetValueNames(HKLM, Key, Names) then
   begin
     for I := 0 to GetArrayLength(Names) - 1 do
@@ -119,25 +114,134 @@ begin
     end;
   end;
 end;
+
+function IsAspNetCore10Installed: Boolean;
+begin
+  Result := IsRuntime10Installed('Microsoft.AspNetCore.App');
+end;
+
+function IsWindowsDesktop10Installed: Boolean;
+begin
+  Result := IsRuntime10Installed('Microsoft.WindowsDesktop.App');
+end;
+
+{ ---- Download and install ---- }
+
+function DownloadFile(Url: String; DestPath: String): Boolean;
+var
+  RC: Integer;
+  PSCmd: String;
+begin
+  Result := False;
+  PSCmd := '-NoProfile -NonInteractive -Command "' +
+    '[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ' +
+    'Invoke-WebRequest -Uri ''' + Url + ''' -OutFile ''' + DestPath + '''"';
+  Exec('powershell.exe', PSCmd, '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Result := (RC = 0) and FileExists(DestPath);
+end;
+
+function InstallRuntime(InstallerPath: String): Boolean;
+var
+  RC: Integer;
+begin
+  { /install /quiet /norestart - silent install without reboot }
+  Exec(InstallerPath, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  { 0 = success, 3010 = success but reboot required }
+  Result := (RC = 0) or (RC = 3010);
+end;
+
+function DownloadAndInstall(ComponentName: String; Url: String; FileName: String): Boolean;
+var
+  TempFile: String;
+begin
+  Result := False;
+  TempFile := ExpandConstant('{tmp}\') + FileName;
+
+  MsgBox(
+    'Downloading ' + ComponentName + '...' + #13#10 +
+    'Please wait, this may take a few minutes.' + #13#10 + #13#10 +
+    'The installer will continue automatically after download.',
+    mbInformation, MB_OK);
+
+  if not DownloadFile(Url, TempFile) then
+  begin
+    MsgBox(
+      'Failed to download ' + ComponentName + '.' + #13#10 + #13#10 +
+      'Please install it manually from:' + #13#10 +
+      'https://dotnet.microsoft.com/download/dotnet/10.0' + #13#10 + #13#10 +
+      'The installation will continue, but the service may not start.',
+      mbError, MB_OK);
+    Exit;
+  end;
+
+  if not InstallRuntime(TempFile) then
+  begin
+    MsgBox(
+      'Failed to install ' + ComponentName + '.' + #13#10 + #13#10 +
+      'Please install it manually from:' + #13#10 +
+      'https://dotnet.microsoft.com/download/dotnet/10.0',
+      mbError, MB_OK);
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+{ ---- Main setup init ---- }
 
 function InitializeSetup: Boolean;
+var
+  NeedAspNet: Boolean;
+  NeedDesktop: Boolean;
+  MissingList: String;
+  Choice: Integer;
 begin
   Result := True;
-  if not IsDotNet10Installed then
+
+  NeedAspNet  := not IsAspNetCore10Installed;
+  NeedDesktop := not IsWindowsDesktop10Installed;
+
+  if (not NeedAspNet) and (not NeedDesktop) then
+    Exit;
+
+  MissingList := '';
+  if NeedAspNet then
+    MissingList := MissingList + '  - ASP.NET Core Runtime 10.0 (x64)' + #13#10;
+  if NeedDesktop then
+    MissingList := MissingList + '  - .NET Desktop Runtime 10.0 (x64)' + #13#10;
+
+  Choice := MsgBox(
+    'The following required .NET 10 components are missing:' + #13#10 + #13#10 +
+    MissingList + #13#10 +
+    'YES    - Download and install automatically (internet required)' + #13#10 +
+    'NO     - Continue without installing (service may not start)' + #13#10 +
+    'CANCEL - Abort installation',
+    mbConfirmation, MB_YESNOCANCEL);
+
+  if Choice = IDCANCEL then
   begin
-    if MsgBox(
-      '.NET 10 Runtime was not found on this computer.' + #13#10 + #13#10 +
-      'The application requires:' + #13#10 +
-      '  - .NET 10 Desktop Runtime (x64) for DesktopUI' + #13#10 +
-      '  - .NET 10 Runtime (x64) for the service' + #13#10 + #13#10 +
-      'Download: https://dotnet.microsoft.com/download/dotnet/10.0' + #13#10 + #13#10 +
-      'Continue installation without .NET 10?',
-      mbConfirmation, MB_YESNO) = IDNO then
-    begin
-      Result := False;
-    end;
+    Result := False;
+    Exit;
   end;
+
+  if Choice = IDNO then
+    Exit;
+
+  { YES - download and install missing components }
+  if NeedAspNet then
+    DownloadAndInstall(
+      'ASP.NET Core Runtime 10.0 (x64)',
+      '{#UrlAspNet}',
+      'aspnetcore-runtime-10.0-win-x64.exe');
+
+  if NeedDesktop then
+    DownloadAndInstall(
+      '.NET Desktop Runtime 10.0 (x64)',
+      '{#UrlDesktop}',
+      'windowsdesktop-runtime-10.0-win-x64.exe');
 end;
+
+{ ---- Service registration after files are copied ---- }
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -164,6 +268,8 @@ begin
     RunSC('start {#ServiceName}');
   end;
 end;
+
+{ ---- Uninstall notification ---- }
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
