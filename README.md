@@ -11,6 +11,8 @@ REST API сервіс для інтеграції з системою M.E.Doc ч
 - Моніторинг стану служби
 - Керування налаштуваннями через Desktop UI
 
+---
+
 ## 🏗️ Архітектура проекту
 
 ```
@@ -37,26 +39,18 @@ Medoc-API-COM-Integration/
 │   │   ├── Converters/                 # XAML Value Converters
 │   │   ├── Models/                     # Моделі UI (ServiceStatus, LogEntry)
 │   │   ├── Services/                   # Сервіси UI
-│   │   │   ├── IServiceController.cs   # Інтерфейс керування службою
-│   │   │   ├── WindowsServiceController.cs # Реалізація ServiceController
-│   │   │   ├── ILogReader.cs           # Інтерфейс читання логів
-│   │   │   └── LogReaderService.cs     # Читання файлів логів
 │   │   ├── ViewModels/                 # MVVM ViewModels
-│   │   │   ├── MainViewModel.cs
-│   │   │   ├── DashboardViewModel.cs
-│   │   │   └── SettingsViewModel.cs
 │   │   ├── Views/                      # XAML вікна та контроли
-│   │   │   ├── MainWindow.xaml         # Головне вікно з вкладками
-│   │   │   └── Pages/
-│   │   │       ├── DashboardPage.xaml  # Служба + Логи
-│   │   │       └── SettingsPage.xaml   # Налаштування
 │   │   ├── App.xaml                    # Application entry point
 │   │   ├── app.manifest                # UAC elevation manifest
 │   │   └── DesktopUI.csproj
 │   └── Service.Tests/                  # Unit-тести
-│       └── Unit/
-└── logs/                               # Логи (генеруються автоматично)
+└── installer/
+    ├── setup.iss                       # Inno Setup скрипт
+    └── build.ps1                       # PowerShell збірка інсталятора
 ```
+
+---
 
 ## 🚀 Технологічний стек
 
@@ -68,30 +62,26 @@ Medoc-API-COM-Integration/
 - **ASP.NET Core Minimal API** — легковажний підхід до створення API
 - **OpenAPI 3.1** — стандарт опису REST API
 - **Scalar 2.12** — сучасний інтерактивний UI для документації API
+- **Microsoft.Extensions.Hosting.WindowsServices** — запуск як Windows Service
 
 ### Desktop UI
 - **WPF (.NET 10)** — Windows Presentation Foundation
 - **MaterialDesignThemes 5.3** — Material Design 3 компоненти
 - **CommunityToolkit.Mvvm 8.4** — MVVM helpers (ObservableObject, RelayCommand)
 - **Microsoft.Extensions.DependencyInjection 10.0** — DI контейнер
-- **Serilog.Extensions.Logging** — інтеграція Serilog з ILogger
 
 ### Логування
 - **Serilog 4.2** — structured logging
-- **Serilog.Sinks.File** — запис у текстові файли з ротацією
-- **Serilog.Sinks.Console** — вивід у консоль
-- **Serilog.Sinks.Debug** — вивід у Debug Output вікно VS
-- **Enrichers** — автоматичне додавання контексту (machine name, thread ID, process ID)
-
-### Конфігурація
-- **JSON налаштування** — гнучка система конфігурації
-- **SettingsManager** — централізоване керування налаштуваннями
-- **Data Annotations** — валідація налаштувань
+- **Serilog.Sinks.File** — запис у файли з ротацією (щодня, 30 днів)
+- **Serilog.Sinks.Console** — вивід у консоль (тільки в інтерактивному режимі)
+- **Enrichers** — machine name, thread ID, process ID, environment
 
 ### Тестування
 - **xUnit 2.9** — фреймворк для unit-тестів
 - **NSubstitute 5.3** — mocking library
 - **FluentAssertions 7.0** — виразні assertions
+
+---
 
 ## 📋 Реалізований функціонал
 
@@ -100,7 +90,6 @@ Medoc-API-COM-Integration/
 #### `GET /health`
 Перевірка стану служби
 
-**Відповідь:**
 ```json
 {
   "result": "ok",
@@ -108,9 +97,7 @@ Medoc-API-COM-Integration/
   "data": {
     "status": "Healthy",
     "checkedAt": "2026-02-19T21:00:00Z",
-    "details": {
-      "uptime": 123.45
-    }
+    "details": { "uptime": 123.45 }
   }
 }
 ```
@@ -118,7 +105,6 @@ Medoc-API-COM-Integration/
 #### `GET /info`
 Інформація про службу (версія, середовище, хост, час запуску)
 
-**Відповідь:**
 ```json
 {
   "result": "ok",
@@ -126,219 +112,228 @@ Medoc-API-COM-Integration/
   "data": {
     "service": "Service",
     "version": "1.0.0.0",
-    "environment": "Development",
+    "environment": "Production",
     "hostName": "DESKTOP-PC",
     "startedAt": "2026-02-19T21:00:00Z"
   }
 }
 ```
 
-### Стандартизований формат відповідей
-
-**Успішна відповідь:**
+#### Стандартний формат відповіді
 ```json
-{
-  "result": "ok",
-  "errorMsg": "",
-  "data": { }
-}
-```
-
-**Відповідь з помилкою:**
-```json
-{
-  "result": "error",
-  "errorMsg": "Опис помилки",
-  "data": null
-}
+{ "result": "ok" | "error", "errorMsg": "", "data": { } }
 ```
 
 ### Desktop UI
+- 🟢/🔴 Індикатор стану служби (автооновлення кожні 5 сек)
+- Кнопки: **Запустити / Зупинити / Перезапустити / Оновити**
+- Відкриття Scalar API документації у браузері
+- Таблиця логів з кольоровим маркуванням (VRB/DBG/INF/WRN/ERR/FTL)
+- Сторінка налаштувань (читання/запис settings.json)
 
-#### Вкладка "Служба та Логи"
-- 🟢/🔴 Індикатор поточного стану служби (автооновлення кожні 5 сек)
-- Кнопки керування: **Запустити / Зупинити / Перезапустити / Оновити**
-- Кнопка відкриття **Scalar API Documentation** у браузері
-- Таблиця логів з кольоровим маркуванням рівнів (VRB/DBG/INF/WRN/ERR/FTL)
-- Кнопки **Оновити** та **Очистити** логи
-
-#### Вкладка "Налаштування"
-- Кнопки **Прочитати** (з файлу) та **Записати** (у файл)
-- **Група API**: адреса, порт, автоматично згенерована повна URL
-- **Група Логування**: вибір мінімального рівня логування з ComboBox
-- Інформаційний блок з шляхом до файлу налаштувань
+---
 
 ## ⚙️ Система налаштувань
 
 ### Файли конфігурації
 
-Проект підтримує дворівневу систему налаштувань:
-
-1. **appsettings.json** — налаштування за замовчуванням (в проекті)
-2. **C:\ProgramData\MedocIntegration\settings.json** — користувацькі налаштування
+| Файл | Призначення |
+|---|---|
+| `src/Service/appsettings.json` | Дефолтні значення (вбудовані в збірку) |
+| `C:\ProgramData\MedocIntegration\settings.json` | Користувацькі налаштування (створюються автоматично при першому запуску) |
 
 ### Доступні налаштування
 
-#### API налаштування
-- **Address** — адреса для прослуховування
-  - `http://localhost` — тільки локальний доступ
-  - `http://0.0.0.0` — доступ з усіх мережевих інтерфейсів
-- **Port** — порт сервера (1-65535)
-
-#### Налаштування логування
-- **MinimumLevel** — мінімальний рівень логування
-  - `Verbose` → `Debug` → `Information` → `Warning` → `Error` → `Fatal`
-
-### Приклад конфігурації
-
-**appsettings.json:**
-```json
-{
-  "AppSettings": {
-    "Api": {
-      "Address": "http://localhost",
-      "Port": 5000
-    },
-    "Logging": {
-      "MinimumLevel": "Information"
-    },
-    "UserSettingsPath": "C:\\ProgramData\\MedocIntegration\\settings.json"
-  }
-}
-```
-
-**C:\ProgramData\MedocIntegration\settings.json:**
 ```json
 {
   "api": {
-    "address": "http://0.0.0.0",
-    "port": 8080
+    "address": "http://localhost",
+    "port": 5000
   },
   "logging": {
-    "minimumLevel": "Warning"
+    "minimumLevel": "Information"
   }
 }
 ```
 
-## 🔧 Налаштування та запуск
+**Address:**
+- `http://localhost` — тільки локальний доступ
+- `http://0.0.0.0` — доступ з усіх мережевих інтерфейсів
 
-### Вимоги
-- Windows 10/11 або Windows Server 2019+
-- .NET 10.0 Runtime
-- Visual Studio 2022 17.13+ (для розробки)
+**MinimumLevel:** `Verbose` | `Debug` | `Information` | `Warning` | `Error` | `Fatal`
+
+---
+
+## 📊 Логування
+
+### Шляхи до файлів логів
+
+```
+C:\ProgramData\MedocIntegration\logs\medocservice-YYYYMMDD.log   ← Windows Service
+C:\ProgramData\MedocIntegration\logs\medocui-YYYYMMDD.log        ← Desktop UI
+```
+
+> **Важливо:** Логи пишуться в `ProgramData` (абсолютний шлях).  
+> Windows Service запускається з робочою директорією `C:\Windows\System32`,  
+> тому відносні шляхи не працюють.
+
+**Console sink** — активний тільки в інтерактивному режимі (`Environment.UserInteractive = true`).  
+Коли служба запущена через SCM — консолі немає, sink автоматично вимикається.
+
+**Формат рядка:**
+```
+2026-02-19 21:00:15.123 +02:00 [INF] [SourceContext] Message
+```
+
+**Параметри:**
+- Ротація: щодня
+- Зберігання: 30 днів
+- Shared access: дозволений (Desktop UI читає одночасно)
+- Flush: кожну секунду
+
+---
+
+## 🖥️ Windows Service
+
+### Параметри служби
+
+| Параметр | Значення |
+|---|---|
+| Ім'я | `MedocIntegrationService` |
+| Display Name | `Medoc Integration Service` |
+| Description | `REST API service for M.E.Doc COM integration` |
+| Start Type | Automatic |
+| Бінарник | `{InstallDir}\Service\Service.exe` |
+| Recovery | Restart after 5s / 10s / 30s |
+
+### Важливе в `Program.cs`
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// ПЕРШИМ — до UseSerilog, UseUrls і будь-чого іншого
+// Встановлює ContentRoot = AppContext.BaseDirectory
+builder.Host.UseWindowsService();
+```
+
+`UseWindowsService()` **обов'язково має бути першим** після `CreateBuilder`.  
+Якщо викликати після `UseSerilog` або `UseUrls` — служба не реєструється правильно і отримуємо **Error 1053**.
+
+---
+
+## 📦 Інсталятор
+
+### Вимоги до системи
+
+| Компонент | Версія | Призначення |
+|---|---|---|
+| Windows | 10/11 або Server 2019+ | Операційна система |
+| `Microsoft.AspNetCore.App` | 10.0.x x64 | **REST API Service** |
+| `Microsoft.WindowsDesktop.App` | 10.0.x x64 | Desktop UI (WPF) |
+
+> ⚠️ **Потрібен саме ASP.NET Core Runtime**, не просто .NET Runtime.  
+> Service — це ASP.NET Core Web Application і без `Microsoft.AspNetCore.App`  
+> служба не запуститься (Error 1053, без жодних логів).
+
+Перевірка встановлених runtime:
+```powershell
+dotnet --list-runtimes
+# Мають бути рядки:
+# Microsoft.AspNetCore.App    10.0.x [...]
+# Microsoft.WindowsDesktop.App 10.0.x [...]
+```
+
+### Збірка інсталятора
+
+```powershell
+git pull
+cd installer
+.\build.ps1 -InnoPath "E:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+```
+
+Результат: `installer\output\MedocIntegration_Setup_1.0.0.exe`
+
+### Поведінка інсталятора
+
+1. **Перевірка .NET компонентів** на старті (registry `HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\...`)
+2. Якщо щось відсутнє — діалог:
+   - **YES** → завантажує і встановлює автоматично (потрібен інтернет)
+   - **NO** → продовжує без встановлення (служба може не стартувати)
+   - **CANCEL** → скасовує інсталяцію
+3. Завантаження через PowerShell `Invoke-WebRequest` з `aka.ms/dotnet/10.0/...`
+4. Встановлення у режимі `/passive` — видно вікно прогресу
+5. Копіювання файлів Service і DesktopUI
+6. Реєстрація і запуск Windows Service через `sc.exe`
+
+**URLs завантаження:**
+```
+https://aka.ms/dotnet/10.0/aspnetcore-runtime-win-x64.exe
+https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe
+```
+
+### Деінсталяція
+
+Служба зупиняється і видаляється автоматично.  
+Файл `C:\ProgramData\MedocIntegration\settings.json` **зберігається** (потрібно видалити вручну).
+
+---
+
+## 🔧 Розробка
 
 ### Запуск у режимі розробки
 
-1. Клонуйте репозиторій:
 ```bash
 git clone https://github.com/Vlad-Lavrenko/Medoc-API-COM-Integration.git
 cd Medoc-API-COM-Integration
 ```
 
-2. Відкрийте solution у Visual Studio 2022:
-```
-Medoc API COM Integration.slnx
-```
+Відкрийте `Medoc API COM Integration.slnx` у Visual Studio.  
+Встановіть Multiple Startup Projects: `Service` → Start, `DesktopUI` → Start.  
+Запустіть `F5`.
 
-3. Встановіть Multiple Startup Projects:
-   - `Service` → **Start**
-   - `DesktopUI` → **Start**
+Scalar документація: `http://localhost:5000/scalar/v1`
 
-4. Запустіть (`F5`)
-
-5. Відкриється Desktop UI та стартує REST API сервер.
-   Scalar документація доступна за адресою:
-```
-http://localhost:5000/scalar/v1
-```
-
-### Встановлення як Windows Service
-
-```powershell
-# Публікація проекту
-dotnet publish src/Service/Service.csproj -c Release -o C:\Services\MedocAPI
-
-# Створення служби
-sc create MedocIntegrationService binPath="C:\Services\MedocAPI\Service.exe"
-
-# Запуск служби
-sc start MedocIntegrationService
-```
-
-### Зміна налаштувань
-
-Варіант 1 — через **Desktop UI** (рекомендовано):
-1. Запустіть `DesktopUI.exe` від імені адміністратора
-2. Перейдіть на вкладку **Налаштування**
-3. Змініть потрібні значення
-4. Натисніть **Записати**
-5. Перезапустіть службу через вкладку **Служба та Логи**
-
-Варіант 2 — вручну:
-1. Відредагуйте `C:\ProgramData\MedocIntegration\settings.json`
-2. Перезапустіть службу:
-```powershell
-sc stop MedocIntegrationService
-sc start MedocIntegrationService
-```
-
-## 📊 Логування
-
-Логи зберігаються у директорії `logs/` з ротацією щодня:
-
-```
-logs/
-├── medocservice-20260219.log
-├── medocservice-20260220.log
-└── ...
-```
-
-**Формат логу:**
-```
-2026-02-19 21:00:15.123 +02:00 [INF] [MedocIntegration.Service.Program] Starting Medoc API COM Integration - Service
-2026-02-19 21:00:16.456 +02:00 [INF] HTTP GET /health responded 200 in 12.3456ms
-```
-
-**Особливості:**
-- Автоматична ротація щодня
-- Зберігання логів протягом 30 днів
-- Shared access — можливість читання файлів іншими процесами (Desktop UI)
-- Structured logging для легкого парсингу
-- Динамічна зміна рівня через файл налаштувань
-
-## 🧪 Тестування
-
-Запуск unit-тестів:
+### Запуск Unit-тестів
 
 ```bash
 dotnet test src/Service.Tests/Service.Tests.csproj
 ```
 
-**Покриття тестами:**
-- ✅ HealthService
-- ✅ InfoService
-- ✅ Endpoints (через integration тести)
+### Налагодження служби без SCM
 
-## 🔐 Безпека
+Коли `Service.exe` запускається напряму (не через SCM), `Environment.UserInteractive = true` — з'являється консоль і Console sink активується автоматично:
 
-- Глобальна обробка виключень через middleware
-- Структуроване логування всіх запитів
-- Стандартизовані повідомлення про помилки
-- Валідація налаштувань
-- UAC elevation для Desktop UI (вимагає права адміністратора)
+```powershell
+cd "C:\Program Files\MedocIntegration\Service"
+.\Service.exe
+# Виводить всі логи в консоль, видно точну помилку
+```
+
+### Ручне керування службою
+
+```powershell
+sc start  MedocIntegrationService
+sc stop   MedocIntegrationService
+sc delete MedocIntegrationService
+```
+
+---
 
 ## 🎯 Roadmap
 
 - [x] REST API з OpenAPI/Scalar документацією
 - [x] Structured logging через Serilog
-- [x] Система налаштувань (JSON)
+- [x] Система налаштувань (JSON + ProgramData)
 - [x] Desktop UI (WPF + Material Design 3)
 - [x] Керування Windows Service через UI
 - [x] Перегляд логів у реальному часі
+- [x] Інсталятор Inno Setup з авто-встановленням .NET
 - [ ] COM інтеграція з M.E.Doc
-- [ ] Endpoints для створення документів
+- [ ] Endpoints для роботи з документами
 - [ ] Електронне підписання через ЕЦП
 - [ ] Авторизація та аутентифікація API
+
+---
 
 ## 📝 Ліцензія
 
@@ -346,9 +341,7 @@ dotnet test src/Service.Tests/Service.Tests.csproj
 
 ## 👨‍💻 Автор
 
-**Vlad Lavrenko**
-- GitHub: [@Vlad-Lavrenko](https://github.com/Vlad-Lavrenko)
-- Email: vlad.lavrenko@gmail.com
+**Vlad Lavrenko** — [@Vlad-Lavrenko](https://github.com/Vlad-Lavrenko)
 
 ## 🔗 Корисні посилання
 
@@ -358,3 +351,5 @@ dotnet test src/Service.Tests/Service.Tests.csproj
 - [Material Design In XAML](https://materialdesigninxaml.net/)
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/)
 - [M.E.Doc Official Site](https://medoc.ua/)
+- [Inno Setup Documentation](https://jrsoftware.org/ishelp/)
+- [.NET 10 Download](https://dotnet.microsoft.com/download/dotnet/10.0)
