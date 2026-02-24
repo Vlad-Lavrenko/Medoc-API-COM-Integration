@@ -133,19 +133,42 @@ var
   PSCmd: String;
 begin
   Result := False;
-  PSCmd := '-NoProfile -NonInteractive -Command "' +
+
+  { SW_SHOWNORMAL - show PowerShell window so user sees download progress }
+  PSCmd :=
+    '-NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' +
     '[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ' +
-    'Invoke-WebRequest -Uri ''' + Url + ''' -OutFile ''' + DestPath + '''"';
-  Exec('powershell.exe', PSCmd, '', SW_HIDE, ewWaitUntilTerminated, RC);
+    'Write-Host ''Downloading .NET package...''; ' +
+    'Write-Host ''URL: ' + Url + '''; ' +
+    'Write-Host ''To:  ' + DestPath + '''; ' +
+    'Invoke-WebRequest -Uri ''' + Url + ''' -OutFile ''' + DestPath + '''; ' +
+    'Write-Host ''Download finished.''; ' +
+    'Start-Sleep -Seconds 2' +
+    '"';
+
+  Exec('powershell.exe', PSCmd, '', SW_SHOWNORMAL, ewWaitUntilTerminated, RC);
   Result := (RC = 0) and FileExists(DestPath);
 end;
 
 function InstallRuntime(InstallerPath: String): Boolean;
 var
   RC: Integer;
+  PSCmd: String;
 begin
-  { /install /quiet /norestart - silent install without reboot }
-  Exec(InstallerPath, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  { /passive shows installer progress UI (not fully silent) }
+  { PowerShell window shows status messages and exit code }
+  PSCmd :=
+    '-NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' +
+    '$p=''' + InstallerPath + '''; ' +
+    'Write-Host ''Installing .NET runtime from:'' $p; ' +
+    '$proc = Start-Process -FilePath $p -ArgumentList ''/install'',''/passive'',''/norestart'' -Wait -PassThru; ' +
+    'Write-Host (''Installer exit code: '' + $proc.ExitCode); ' +
+    'Start-Sleep -Seconds 2; ' +
+    'exit $proc.ExitCode' +
+    '"';
+
+  Exec('powershell.exe', PSCmd, '', SW_SHOWNORMAL, ewWaitUntilTerminated, RC);
+
   { 0 = success, 3010 = success but reboot required }
   Result := (RC = 0) or (RC = 3010);
 end;
@@ -159,8 +182,8 @@ begin
 
   MsgBox(
     'Downloading ' + ComponentName + '...' + #13#10 +
-    'Please wait, this may take a few minutes.' + #13#10 + #13#10 +
-    'The installer will continue automatically after download.',
+    'A console window will open showing the download progress.' + #13#10 + #13#10 +
+    'Please wait until it closes automatically.',
     mbInformation, MB_OK);
 
   if not DownloadFile(Url, TempFile) then
@@ -174,6 +197,11 @@ begin
     Exit;
   end;
 
+  MsgBox(
+    'Installing ' + ComponentName + '...' + #13#10 +
+    'A progress window will appear. Please wait until it completes.',
+    mbInformation, MB_OK);
+
   if not InstallRuntime(TempFile) then
   begin
     MsgBox(
@@ -183,6 +211,10 @@ begin
       mbError, MB_OK);
     Exit;
   end;
+
+  MsgBox(
+    ComponentName + ' installed successfully!',
+    mbInformation, MB_OK);
 
   Result := True;
 end;
